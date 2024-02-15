@@ -16,6 +16,7 @@ BLUE_COLOR = (0, 0, 255)
 YELLOW_COLOR = (255, 255, 0)
 GREEN_COLOR = (0, 255, 0)
 VIOLET_COLOR = (128, 0, 128)
+ORANGE_COLOR = (255, 165, 0)
 PLAYER1_COLOR = RED_COLOR
 PLAYER2_COLOR = BLUE_COLOR
 
@@ -23,6 +24,14 @@ PLAYER2_COLOR = BLUE_COLOR
 class PowerUpType:
     def __init__(self, name):
         self.name = name
+
+
+class SwitchPlayers(PowerUpType):
+    def __init__(self):
+        super().__init__(name='Switch Players')
+
+    def __repr__(self):
+        return self.name
 
 
 class DoubleScore(PowerUpType):
@@ -84,10 +93,14 @@ class Game:
 
     def spawn_coins(self):
         # Spawn coins
-        if time.time() - self.coin_spawn_time > 0.8 and len(self.coins) < 5:
+        if time.time() - self.coin_spawn_time > 0.2 and len(self.coins) < 10:
             coin_x = random.randint(0, SCREEN_WIDTH)
             coin_y = random.randint(0, SCREEN_HEIGHT)
-            coin = Coin(coin_x, coin_y)
+            if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
+                coin = Coin(coin_x, coin_y)
+                coin.image.fill(ORANGE_COLOR)
+            else:
+                coin = Coin(coin_x, coin_y)
             # Check if coin is spawned inside a platform
             if not any(coin.rect.colliderect(platform.rect) for platform in self.platforms):
                 self.coins.append(coin)
@@ -98,13 +111,16 @@ class Game:
         if time.time() - self.power_up_spawn_time > 10 and len(self.power_ups) < 1:  # Spawn a power-up every 10 seconds
             power_up_x = random.randint(0, SCREEN_WIDTH)
             power_up_y = random.randint(0, SCREEN_HEIGHT)
-            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility()]))
+            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility(), SwitchPlayers()]))
             self.power_ups.append(power_up)
             self.power_up_spawn_time = time.time()
 
     def spawn_platforms(self):
         if self.total_score // 20 > self._last_score // 20:
-            self.platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
+            self.platforms.append(Platform(random.randint(0, SCREEN_WIDTH - 100),
+                                           random.randint(0, SCREEN_HEIGHT - 10),
+                                           100,
+                                           10))
             self._last_score = self.total_score
 
     def update(self):
@@ -123,9 +139,20 @@ class Game:
                     if isinstance(self.power_up, Invincibility):
                         for p in self.players:
                             p.change_color(WHITE_COLOR)
+                    elif isinstance(self.power_up, SwitchPlayers):
+                        self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[
+                            0].controls
+                    elif isinstance(self.power_up, DoubleScore):
+                        for coin in self.coins:
+                            coin.image.fill(ORANGE_COLOR)
                     self.power_ups.remove(power_up)
-            if (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time > 10) or (
-                    isinstance(self.power_up, DoubleScore) and player.current_color == WHITE_COLOR):
+            if isinstance(self.power_up, SwitchPlayers) and time.time() - self.power_up_start_time > 10:
+                self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[0].controls
+            if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time > 10:
+                for coin in self.coins:
+                    coin.image.fill(YELLOW_COLOR)
+            if isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time > 10 or (
+                    not isinstance(self.power_up, Invincibility) and player.current_color == WHITE_COLOR):
                 for p in self.players:
                     p.reset_color()
             for coin in self.coins:
@@ -146,6 +173,7 @@ class Game:
         self.power_up = None  # The current power-up
         self.power_up_start_time = None  # The time when the power-up was collected
         self.total_score = 0
+        self._last_score = 0
         # Reset player attributes
         for player in self.players:
             player.image.fill(player.original_color)  # Reset player color
