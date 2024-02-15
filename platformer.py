@@ -24,7 +24,13 @@ class DoubleScore(PowerUpType):
     def __repr__(self):
         return self.name
 
-    # Coin class
+
+class Invincibility(PowerUpType):
+    def __init__(self):
+        super().__init__(name='Invincibility')
+
+    def __repr__(self):
+        return self.name
 
 
 class Coin(pygame.sprite.Sprite):
@@ -59,18 +65,19 @@ class Game:
         self.power_up = None  # The current power-up
         self.power_up_start_time = None  # The time when the power-up was collected
         self.total_score = 0
+        self.best_score = self.total_score
 
     def update(self, players, platforms, coins, power_ups):
         for player in players:
             for platform in platforms:
                 if pygame.sprite.collide_rect(player, platform):
-                    self.reset_game(players, coins, power_ups, platforms)
-                    main_menu()
+                    if not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
+                        self.reset_game(players, coins, power_ups, platforms)
+                        main_menu()
             for power_up in power_ups:
                 if pygame.sprite.collide_rect(player, power_up):
                     self.power_up = power_up.type  # Collect the power-up
-                    if isinstance(self.power_up, DoubleScore):
-                        self.power_up_start_time = time.time()  # Start the timer
+                    self.power_up_start_time = time.time()  # Start the timer
                     power_ups.remove(power_up)
             for coin in coins:
                 if pygame.sprite.collide_rect(player, coin):
@@ -79,7 +86,7 @@ class Game:
                     else:
                         self.total_score += 1  # Normal score for each coin
                     coins.remove(coin)
-
+        self.best_score = max(self.best_score, self.total_score)
         self.update_level()
 
     def update_level(self):
@@ -170,9 +177,7 @@ def main():
                      {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}, (255, 0, 0))
     player2 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
                      {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}, (0, 0, 255))
-    platforms_count = 0
-    platforms = [Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 20) for _ in
-                 range(platforms_count)]
+    platforms = []
 
     coins = []
 
@@ -201,19 +206,17 @@ def main():
         # Update
         player1.update(platforms, coins, power_ups, player2)
         player2.update(platforms, coins, power_ups, player1)
-        game.update(players=[player1, player2], platforms=platforms, coins=coins, power_ups=power_ups)
 
         if game.total_score // 20 > last_platform_score // 20:
-            platforms_count += 1
-            platforms = [Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 20) for _ in
-                         range(platforms_count)]
+            platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
             last_platform_score = game.total_score
+        game.update(players=[player1, player2], platforms=platforms, coins=coins, power_ups=power_ups)
 
         # Spawn power-ups
         if time.time() - power_up_spawn_time > 10 and len(power_ups) < 1:  # Spawn a power-up every 10 seconds
             power_up_x = random.randint(0, SCREEN_WIDTH)
             power_up_y = random.randint(0, SCREEN_HEIGHT)
-            power_up = PowerUp(power_up_x, power_up_y, DoubleScore())  # Create a new power-up
+            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility()]))
             power_ups.append(power_up)
             power_up_spawn_time = time.time()
 
@@ -243,7 +246,7 @@ def main():
         screen.blit(score_text, (SCREEN_WIDTH - score_text.get_width() - 10, 10))
 
         # Draw power-up timer
-        if isinstance(game.power_up, DoubleScore):
+        if isinstance(game.power_up, PowerUpType):
             remaining_time = 10 - int(time.time() - game.power_up_start_time)
             if remaining_time > 0:
                 timer_text = font.render(f"{str(game.power_up)}: {remaining_time}s", True, (255, 255, 0))
@@ -251,6 +254,9 @@ def main():
 
         level_text = font.render(f"Level: {game.level}", True, (255, 255, 0))
         screen.blit(level_text, (SCREEN_WIDTH // 2 - level_text.get_width() // 2, 10))
+
+        best_text = font.render(f"Best: {game.best_score}", True, (255, 255, 0))
+        screen.blit(best_text, (SCREEN_WIDTH - 100 - score_text.get_width() - 10, 10))
 
         pygame.display.flip()
         pygame.time.Clock().tick(60)
