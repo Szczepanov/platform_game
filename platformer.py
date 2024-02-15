@@ -231,7 +231,7 @@ def main():
             game.power_up_spawn_time = time.time()
 
         # Spawn coins
-        if time.time() - game.coin_spawn_time > 1 and len(game.coins) < 4:
+        if time.time() - game.coin_spawn_time > 0.8 and len(game.coins) < 5:
             coin_x = random.randint(0, SCREEN_WIDTH)
             coin_y = random.randint(0, SCREEN_HEIGHT)
             coin = Coin(coin_x, coin_y)
@@ -266,7 +266,7 @@ def main():
         screen.blit(level_text, (SCREEN_WIDTH // 2 - level_text.get_width() // 2, 10))
 
         best_text = font.render(f"Best: {game.best_score}", True, YELLOW_COLOR)
-        screen.blit(best_text, (SCREEN_WIDTH - 100 - score_text.get_width() - 10, 10))
+        screen.blit(best_text, (SCREEN_WIDTH - 150 - score_text.get_width() - 10, 10))
 
         pygame.display.flip()
         pygame.time.Clock().tick(60)
