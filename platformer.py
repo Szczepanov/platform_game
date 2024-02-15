@@ -66,8 +66,12 @@ class Game:
                 if pygame.sprite.collide_rect(player, platform):
                     self.reset_game(players, coins, power_ups, platforms)
                     main_menu()
-
-        for player in players:
+            for power_up in power_ups:
+                if pygame.sprite.collide_rect(player, power_up):
+                    self.power_up = power_up.type  # Collect the power-up
+                    if isinstance(self.power_up, DoubleScore):
+                        self.power_up_start_time = time.time()  # Start the timer
+                    power_ups.remove(power_up)
             for coin in coins:
                 if pygame.sprite.collide_rect(player, coin):
                     if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
@@ -76,14 +80,6 @@ class Game:
                         self.total_score += 1  # Normal score for each coin
                     coins.remove(coin)
 
-        # Collect power-ups
-        for player in players:
-            for power_up in power_ups:
-                if pygame.sprite.collide_rect(player, power_up):
-                    self.power_up = power_up.type  # Collect the power-up
-                    if isinstance(self.power_up, DoubleScore):
-                        self.power_up_start_time = time.time()  # Start the timer
-                    power_ups.remove(power_up)
         self.update_level()
 
     def update_level(self):
@@ -122,7 +118,7 @@ class Player(pygame.sprite.Sprite):
         self.vel_y = 0
         self.controls = controls
 
-    def update(self, platforms, coins, power_ups):
+    def update(self, platforms, coins, power_ups, other_player):
         self.vel_y += 0.5  # Gravity
         self.rect.y += int(self.vel_y)  # Convert self.vel_y to an integer
 
@@ -146,6 +142,11 @@ class Player(pygame.sprite.Sprite):
             self.rect.top = 0
         if self.rect.bottom > SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
+
+        # Check for collision with other player
+        if pygame.sprite.collide_rect(self, other_player):
+            # Swap x-coordinates to simulate bouncing off each other
+            self.rect.x, other_player.rect.x = other_player.rect.x, self.rect.x
 
 
 def main_menu():
@@ -198,8 +199,8 @@ def main():
                 running = False
 
         # Update
-        player1.update(platforms, coins, power_ups)
-        player2.update(platforms, coins, power_ups)
+        player1.update(platforms, coins, power_ups, player2)
+        player2.update(platforms, coins, power_ups, player1)
         game.update(players=[player1, player2], platforms=platforms, coins=coins, power_ups=power_ups)
 
         if game.total_score // 20 > last_platform_score // 20:
