@@ -80,8 +80,35 @@ class Game:
         self.platforms = [] if platforms is None else platforms
         self.power_up_spawn_time = time.time()
         self.coin_spawn_time = time.time()
+        self._last_score = 0
+
+    def spawn_coins(self):
+        # Spawn coins
+        if time.time() - self.coin_spawn_time > 0.8 and len(self.coins) < 5:
+            coin_x = random.randint(0, SCREEN_WIDTH)
+            coin_y = random.randint(0, SCREEN_HEIGHT)
+            coin = Coin(coin_x, coin_y)
+            # Check if coin is spawned inside a platform
+            if not any(coin.rect.colliderect(platform.rect) for platform in self.platforms):
+                self.coins.append(coin)
+                self.coin_spawn_time = time.time()
+
+    def spawn_power_ups(self):
+        # Spawn power-ups
+        if time.time() - self.power_up_spawn_time > 10 and len(self.power_ups) < 1:  # Spawn a power-up every 10 seconds
+            power_up_x = random.randint(0, SCREEN_WIDTH)
+            power_up_y = random.randint(0, SCREEN_HEIGHT)
+            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility()]))
+            self.power_ups.append(power_up)
+            self.power_up_spawn_time = time.time()
+
+    def spawn_platforms(self):
+        if self.total_score // 20 > self._last_score // 20:
+            self.platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
+            self._last_score = self.total_score
 
     def update(self):
+        self.spawn_platforms()
         for player in self.players:
             player.update()
             for platform in self.platforms:
@@ -217,28 +244,10 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        if game.total_score // 20 > last_platform_score // 20:
-            game.platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
-            last_platform_score = game.total_score
         game.update()
 
-        # Spawn power-ups
-        if time.time() - game.power_up_spawn_time > 10 and len(game.power_ups) < 1:  # Spawn a power-up every 10 seconds
-            power_up_x = random.randint(0, SCREEN_WIDTH)
-            power_up_y = random.randint(0, SCREEN_HEIGHT)
-            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility()]))
-            game.power_ups.append(power_up)
-            game.power_up_spawn_time = time.time()
-
-        # Spawn coins
-        if time.time() - game.coin_spawn_time > 0.8 and len(game.coins) < 5:
-            coin_x = random.randint(0, SCREEN_WIDTH)
-            coin_y = random.randint(0, SCREEN_HEIGHT)
-            coin = Coin(coin_x, coin_y)
-            # Check if coin is spawned inside a platform
-            if not any(coin.rect.colliderect(platform.rect) for platform in game.platforms):
-                game.coins.append(coin)
-                game.coin_spawn_time = time.time()
+        game.spawn_power_ups()
+        game.spawn_coins()
 
         # Draw
         screen.fill((0, 0, 0))  # Black background
