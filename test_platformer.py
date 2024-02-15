@@ -1,93 +1,77 @@
-import pytest
-import unittest
-from platformer import Player, Coin, Platform, PowerUp, Game, DoubleScore, SCREEN_WIDTH, SCREEN_HEIGHT
+from platformer import Player, Game, PowerUp, Coin, Platform
+from unittest.mock import patch
 
 
-class TestPlayer(unittest.TestCase):
-    @pytest.fixture
-    def player(self):
-        return Player(400, 300, {'left': 0, 'right': 0, 'up': 0}, (255, 0, 0))
-
-    def test_initialization2(self, player):
-        assert player.rect.x == 400
-        assert player.rect.y == 300
-        assert player.image.fill() == (255, 0, 0)
-
-    def setUp(self):
-        self.player = Player(400, 300, {'left': 0, 'right': 0, 'up': 0}, (255, 0, 0))
-
-    def test_initialization(self):
-        self.assertEqual(self.player.rect.x, 400)
-        self.assertEqual(self.player.rect.y, 300)
-        self.assertEqual(self.player.image.fill(), (255, 0, 0))
-
-    # Add more tests for Player methods
+def test_player_initialization():
+    player = Player(100, 100, {'left': 'a', 'right': 'd', 'jump': 'w'}, (255, 0, 0))
+    assert player.rect.x == 75
+    assert player.rect.y == 75
+    assert player.controls == {'left': 'a', 'right': 'd', 'jump': 'w'}
+    assert player.original_color == (255, 0, 0)
 
 
-class TestCoin(unittest.TestCase):
-    def setUp(self):
-        self.coin = Coin(100, 100)
-
-    def test_initialization(self):
-        self.assertEqual(self.coin.rect.x, 100)
-        self.assertEqual(self.coin.rect.y, 100)
-        self.assertEqual(self.coin.image.fill(), (255, 255, 0))
-
-    # Add more tests for Coin methods
+def test_game_initialization():
+    game = Game()
+    assert game.players == []
+    assert game.platforms == []
+    assert game.coins == []
+    assert game.power_ups == []
 
 
-class TestGame(unittest.TestCase):
-    def setUp(self):
-        self.game = Game()
-
-    def test_update_level(self):
-        self.game.update_level(50)
-        self.assertEqual(self.game.level, 3)
-
-    def test_reset_game(self):
-        players = [Player(400, 300, {'left': 0, 'right': 0, 'up': 0}, (255, 0, 0)) for _ in range(2)]
-        coins = [Coin(100, 100) for _ in range(5)]
-        power_ups = [PowerUp(200, 200, DoubleScore()) for _ in range(2)]
-        platforms = []
-        self.game.reset_game(players, coins, power_ups, platforms)
-        self.assertEqual(self.game.power_up, None)
-        self.assertEqual(self.game.power_up_start_time, None)
-        self.assertEqual(len(coins), 0)
-        self.assertEqual(len(power_ups), 0)
-        for player in players:
-            self.assertEqual(player.rect.x, SCREEN_WIDTH // 2)
-            self.assertEqual(player.rect.y, SCREEN_HEIGHT // 2)
-            self.assertEqual(player.vel_y, 0)
-            self.assertEqual(player.jumps, 0)
-            self.assertEqual(player.score, 0)
+def test_powerup_initialization():
+    powerup = PowerUp(100, 100, 'DoubleScore')
+    assert powerup.rect.x == 90
+    assert powerup.rect.y == 90
+    assert powerup.type == 'DoubleScore'
 
 
-class TestPowerUp(unittest.TestCase):
-    def setUp(self):
-        self.power_up = PowerUp(200, 200, DoubleScore())
-
-    def test_initialization(self):
-        self.assertEqual(self.power_up.rect.x, 200)
-        self.assertEqual(self.power_up.rect.y, 200)
-        self.assertIsInstance(self.power_up.type, DoubleScore)
-
-    def test_effect(self):
-        player = Player(400, 300, {'left': 0, 'right': 0, 'up': 0}, (255, 0, 0))
-        player.score = 10
-        self.power_up.type.apply(player)
-        self.assertEqual(player.score, 20)
+def test_coin_initialization():
+    coin = Coin(100, 100)
+    assert coin.rect.x == 90
+    assert coin.rect.y == 90
 
 
-class TestPlatform(unittest.TestCase):
-    def setUp(self):
-        self.platform = Platform(100, 200, 50, 10)
-
-    def test_initialization(self):
-        self.assertEqual(self.platform.rect.x, 100)
-        self.assertEqual(self.platform.rect.y, 200)
-        self.assertEqual(self.platform.rect.width, 50)
-        self.assertEqual(self.platform.rect.height, 10)
+def test_platform_initialization():
+    platform = Platform(100, 100, 200, 20)
+    assert platform.rect.x == 100
+    assert platform.rect.y == 100
+    assert platform.rect.width == 200
+    assert platform.rect.height == 20
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_player_color_change_on_powerup():
+    game = Game()
+    player = Player(100, 100, {'left': 'a', 'right': 'd', 'jump': 'w'}, (255, 0, 0))
+    game.players.append(player)
+    powerup = PowerUp(100, 100, 'Invincibility')
+    game.power_ups.append(powerup)
+    game.update()
+    assert player.image.get_at((0, 0)) == (255, 255, 255)  # Check if player color changed to white
+
+
+def test_score_increase_on_coin_pickup():
+    game = Game()
+    player = Player(100, 100, {'left': 'a', 'right': 'd', 'jump': 'w'}, (255, 0, 0))
+    game.players.append(player)
+    coin = Coin(100, 100)
+    game.coins.append(coin)
+    initial_score = game.total_score
+    game.update()
+    assert game.total_score == initial_score + 1  # Check if score increased by 1
+
+
+
+
+def test_player_color_reset_after_powerup_ends():
+    with patch('time.time', return_value=0):  # Mock time.time() to always return 0
+        game = Game()
+        player = Player(100, 100, {'left': 'a', 'right': 'd', 'jump': 'w'}, (255, 0, 0))
+        game.players.append(player)
+        powerup = PowerUp(100, 100, 'Invincibility')
+        game.power_ups.append(powerup)
+        game.update()
+        assert player.image.get_at((0, 0)) == (255, 255, 255)  # Check if player color changed to white
+
+    with patch('time.time', return_value=11):  # Mock time.time() to return 11, simulating the passage of 11 seconds
+        game.update()
+        assert player.image.get_at((0, 0)) == (255, 0, 0)  # Check if player color reset to original color

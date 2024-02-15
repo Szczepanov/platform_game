@@ -68,73 +68,77 @@ class PowerUp(pygame.sprite.Sprite):
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, players=None, power_ups=None, coins=None, platforms=None):
         self.level = 1
         self.power_up = None  # The current power-up
         self.power_up_start_time = None  # The time when the power-up was collected
         self.total_score = 0
         self.best_score = self.total_score
+        self.players = [] if players is None else players
+        self.power_ups = [] if power_ups is None else power_ups
+        self.coins = [] if coins is None else coins
+        self.platforms = [] if platforms is None else platforms
+        self.power_up_spawn_time = time.time()
+        self.coin_spawn_time = time.time()
 
-    def update(self, players, platforms, coins, power_ups):
-        for player in players:
-            for platform in platforms:
+    def update(self):
+        for player in self.players:
+            player.update()
+            for platform in self.platforms:
                 if pygame.sprite.collide_rect(player, platform):
                     if not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
-                        self.reset_game(players, coins, power_ups, platforms)
+                        self.reset_game()
                         main_menu()
-            for power_up in power_ups:
+            for power_up in self.power_ups:
                 if pygame.sprite.collide_rect(player, power_up):
                     self.power_up = power_up.type  # Collect the power-up
                     self.power_up_start_time = time.time()  # Start the timer
                     if isinstance(self.power_up, Invincibility):
-                        for p in players:
+                        for p in self.players:
                             p.change_color(WHITE_COLOR)
-                    power_ups.remove(power_up)
+                    self.power_ups.remove(power_up)
             if (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time > 10) or (
                     isinstance(self.power_up, DoubleScore) and player.current_color == WHITE_COLOR):
-                for p in players:
+                for p in self.players:
                     p.reset_color()
-            for coin in coins:
+            for coin in self.coins:
                 if pygame.sprite.collide_rect(player, coin):
                     if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
                         self.total_score += 2  # Double the score for each coin
                     else:
                         self.total_score += 1  # Normal score for each coin
-                    coins.remove(coin)
+                    self.coins.remove(coin)
         self.best_score = max(self.best_score, self.total_score)
         self.update_level()
 
     def update_level(self):
         self.level = self.total_score // 20 + 1
 
-    def reset_game(self, players, coins, power_ups, platforms):
+    def reset_game(self):
         self.level = 1
         self.power_up = None  # The current power-up
         self.power_up_start_time = None  # The time when the power-up was collected
         self.total_score = 0
         # Reset player attributes
-        for player in players:
+        for player in self.players:
             player.image.fill(player.original_color)  # Reset player color
             player.rect.x = SCREEN_WIDTH // 2
             player.rect.y = SCREEN_HEIGHT // 2
             player.vel_y = 0
 
         # Clear coins and power-ups
-        coins.clear()
-        power_ups.clear()
-        platforms.clear()
+        self.coins.clear()
+        self.power_ups.clear()
+        self.platforms.clear()
 
         # Reset spawn timers
-        global power_up_spawn_time
-        global coin_spawn_time
-        power_up_spawn_time = time.time()
-        coin_spawn_time = time.time()
+        self.power_up_spawn_time = time.time()
+        self.coin_spawn_time = time.time()
 
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, controls, color):
         super().__init__()
-        self.power_up_start_time = None
         self.image = pygame.Surface((50, 50))
         self.original_color = color
         self.current_color = color
@@ -151,7 +155,7 @@ class Player(pygame.sprite.Sprite):
         self.current_color = self.original_color
         self.image.fill(self.current_color)
 
-    def update(self, platforms, coins, power_ups, other_player):
+    def update(self):
         self.vel_y += 0.5  # Gravity
         self.rect.y += int(self.vel_y)  # Convert self.vel_y to an integer
 
@@ -176,11 +180,6 @@ class Player(pygame.sprite.Sprite):
         if self.rect.bottom > SCREEN_HEIGHT:
             self.rect.bottom = SCREEN_HEIGHT
 
-        # Check for collision with other player
-        if pygame.sprite.collide_rect(self, other_player):
-            # Swap x-coordinates to simulate bouncing off each other
-            self.rect.x, other_player.rect.x = other_player.rect.x, self.rect.x
-
 
 def main_menu():
     menu_font = pygame.font.Font(None, 50)
@@ -203,22 +202,11 @@ def main():
                      {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}, PLAYER1_COLOR)
     player2 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
                      {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}, PLAYER2_COLOR)
-    platforms = []
-
-    coins = []
-
-    # Power-up spawn timer
-    power_up_spawn_time = time.time()
-    # Coin spawn timer
-    coin_spawn_time = time.time()
-
     # Font for displaying score
     font = pygame.font.Font(None, 36)
 
-    # Create sprites
-    power_ups = []  # List of power-ups
     # Create game instance
-    game = Game()
+    game = Game(players=[player1, player2])
     last_platform_score = 0
     # Call the main_menu function before the game loop
     main_menu()
@@ -229,42 +217,38 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        # Update
-        player1.update(platforms, coins, power_ups, player2)
-        player2.update(platforms, coins, power_ups, player1)
-
         if game.total_score // 20 > last_platform_score // 20:
-            platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
+            game.platforms.append(Platform(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT), 100, 10))
             last_platform_score = game.total_score
-        game.update(players=[player1, player2], platforms=platforms, coins=coins, power_ups=power_ups)
+        game.update()
 
         # Spawn power-ups
-        if time.time() - power_up_spawn_time > 10 and len(power_ups) < 1:  # Spawn a power-up every 10 seconds
+        if time.time() - game.power_up_spawn_time > 10 and len(game.power_ups) < 1:  # Spawn a power-up every 10 seconds
             power_up_x = random.randint(0, SCREEN_WIDTH)
             power_up_y = random.randint(0, SCREEN_HEIGHT)
             power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility()]))
-            power_ups.append(power_up)
-            power_up_spawn_time = time.time()
+            game.power_ups.append(power_up)
+            game.power_up_spawn_time = time.time()
 
         # Spawn coins
-        if time.time() - coin_spawn_time > 1 and len(coins) < 4:
+        if time.time() - game.coin_spawn_time > 1 and len(game.coins) < 4:
             coin_x = random.randint(0, SCREEN_WIDTH)
             coin_y = random.randint(0, SCREEN_HEIGHT)
             coin = Coin(coin_x, coin_y)
             # Check if coin is spawned inside a platform
-            if not any(coin.rect.colliderect(platform.rect) for platform in platforms):
-                coins.append(coin)
-                coin_spawn_time = time.time()
+            if not any(coin.rect.colliderect(platform.rect) for platform in game.platforms):
+                game.coins.append(coin)
+                game.coin_spawn_time = time.time()
 
         # Draw
         screen.fill((0, 0, 0))  # Black background
-        screen.blit(player1.image, player1.rect)
-        screen.blit(player2.image, player2.rect)
-        for power_up in power_ups:
+        for player in game.players:
+            screen.blit(player.image, player.rect)
+        for power_up in game.power_ups:
             screen.blit(power_up.image, power_up.rect)
-        for platform in platforms:
+        for platform in game.platforms:
             screen.blit(platform.image, platform.rect)
-        for coin in coins:
+        for coin in game.coins:
             screen.blit(coin.image, coin.rect)
 
         # Draw score
