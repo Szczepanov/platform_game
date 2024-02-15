@@ -88,3 +88,6 @@ class TestPlatform(unittest.TestCase):
         self.assertEqual(self.platform.rect.width, 50)
         self.assertEqual(self.platform.rect.height, 10)
 
+
+if __name__ == '__main__':
+    unittest.main()
