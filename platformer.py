@@ -3,22 +3,26 @@ import sys
 import random
 import time
 
+# Constants
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+BLUE = (100, 120, 155)
+YELLOW = (255, 255, 0)
+GREEN = (0, 255, 0)
+VIOLET = (128, 0, 128)
+ORANGE = (255, 165, 0)
+PLAYER1_COLOR = RED
+PLAYER2_COLOR = BLUE
+# Player controls
+PLAYER1_CONTROLS = {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}
+PLAYER2_CONTROLS = {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}
+
 # Initialize Pygame
 pygame.init()
-
-# Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Platformer")
-WHITE_COLOR = (255, 255, 255)
-RED_COLOR = (255, 0, 0)
-BLUE_COLOR = (0, 0, 255)
-YELLOW_COLOR = (255, 255, 0)
-GREEN_COLOR = (0, 255, 0)
-VIOLET_COLOR = (128, 0, 128)
-ORANGE_COLOR = (255, 165, 0)
-PLAYER1_COLOR = RED_COLOR
-PLAYER2_COLOR = BLUE_COLOR
 
 
 class PowerUpType:
@@ -54,7 +58,7 @@ class Coin(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         self.image = pygame.Surface((20, 20))
-        self.image.fill(YELLOW_COLOR)  # Yellow color
+        self.image.fill(YELLOW)  # Yellow color
         self.rect = self.image.get_rect(center=(x, y))
 
 
@@ -63,7 +67,7 @@ class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
         super().__init__()
         self.image = pygame.Surface((width, height))
-        self.image.fill(GREEN_COLOR)  # Green color
+        self.image.fill(GREEN)  # Green color
         self.rect = self.image.get_rect(topleft=(x, y))
 
 
@@ -71,7 +75,7 @@ class PowerUp(pygame.sprite.Sprite):
     def __init__(self, x, y, type):
         super().__init__()
         self.image = pygame.Surface((20, 20))
-        self.image.fill(VIOLET_COLOR)
+        self.image.fill(VIOLET)
         self.rect = self.image.get_rect(center=(x, y))
         self.type = type  # The type of power-up
 
@@ -98,7 +102,7 @@ class Game:
             coin_y = random.randint(0, SCREEN_HEIGHT)
             if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
                 coin = Coin(coin_x, coin_y)
-                coin.image.fill(ORANGE_COLOR)
+                coin.image.fill(ORANGE)
             else:
                 coin = Coin(coin_x, coin_y)
             # Check if coin is spawned inside a platform
@@ -138,21 +142,24 @@ class Game:
                     self.power_up_start_time = time.time()  # Start the timer
                     if isinstance(self.power_up, Invincibility):
                         for p in self.players:
-                            p.change_color(WHITE_COLOR)
+                            p.change_color(WHITE)
                     elif isinstance(self.power_up, SwitchPlayers):
                         self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[
                             0].controls
-                    elif isinstance(self.power_up, DoubleScore):
+                    elif isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
                         for coin in self.coins:
-                            coin.image.fill(ORANGE_COLOR)
+                            coin.image.fill(ORANGE)
+                    else:
+                        for coin in self.coins:
+                            coin.image.fill(YELLOW)
                     self.power_ups.remove(power_up)
             if isinstance(self.power_up, SwitchPlayers) and time.time() - self.power_up_start_time > 10:
                 self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[0].controls
             if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time > 10:
                 for coin in self.coins:
-                    coin.image.fill(YELLOW_COLOR)
+                    coin.image.fill(YELLOW)
             if isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time > 10 or (
-                    not isinstance(self.power_up, Invincibility) and player.current_color == WHITE_COLOR):
+                    not isinstance(self.power_up, Invincibility) and player.current_color == WHITE):
                 for p in self.players:
                     p.reset_color()
             for coin in self.coins:
@@ -180,7 +187,7 @@ class Game:
             player.rect.x = SCREEN_WIDTH // 2
             player.rect.y = SCREEN_HEIGHT // 2
             player.vel_y = 0
-
+            player.controls = PLAYER1_CONTROLS if player.original_color == PLAYER1_COLOR else PLAYER2_CONTROLS
         # Clear coins and power-ups
         self.coins.clear()
         self.power_ups.clear()
@@ -238,7 +245,7 @@ class Player(pygame.sprite.Sprite):
 
 def main_menu():
     menu_font = pygame.font.Font(None, 50)
-    label = menu_font.render("Press any key to start", 1, YELLOW_COLOR)
+    label = menu_font.render("Press any key to start", 1, YELLOW)
     while True:
         screen.fill((0, 0, 0))
         screen.blit(label, (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2))
@@ -289,20 +296,20 @@ def main():
             screen.blit(coin.image, coin.rect)
 
         # Draw score
-        score_text = font.render(f"Coins: {game.total_score}", True, YELLOW_COLOR)
+        score_text = font.render(f"Coins: {game.total_score}", True, YELLOW)
         screen.blit(score_text, (SCREEN_WIDTH - score_text.get_width() - 10, 10))
 
         # Draw power-up timer
         if isinstance(game.power_up, PowerUpType):
             remaining_time = 10 - int(time.time() - game.power_up_start_time)
             if remaining_time > 0:
-                timer_text = font.render(f"{str(game.power_up)}: {remaining_time}s", True, YELLOW_COLOR)
+                timer_text = font.render(f"{str(game.power_up)}: {remaining_time}s", True, YELLOW)
                 screen.blit(timer_text, (10, 10))
 
-        level_text = font.render(f"Level: {game.level}", True, YELLOW_COLOR)
+        level_text = font.render(f"Level: {game.level}", True, YELLOW)
         screen.blit(level_text, (SCREEN_WIDTH // 2 - level_text.get_width() // 2, 10))
 
-        best_text = font.render(f"Best: {game.best_score}", True, YELLOW_COLOR)
+        best_text = font.render(f"Best: {game.best_score}", True, YELLOW)
         screen.blit(best_text, (SCREEN_WIDTH - 150 - score_text.get_width() - 10, 10))
 
         pygame.display.flip()
