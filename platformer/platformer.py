@@ -2,27 +2,9 @@ import pygame
 import sys
 import random
 import time
-
-# Constants
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-BLUE = (100, 120, 155)
-YELLOW = (255, 255, 0)
-GREEN = (0, 255, 0)
-VIOLET = (128, 0, 128)
-ORANGE = (255, 165, 0)
-PLAYER1_COLOR = RED
-PLAYER2_COLOR = BLUE
-# Player controls
-PLAYER1_CONTROLS = {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}
-PLAYER2_CONTROLS = {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}
-
-# Initialize Pygame
-pygame.init()
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Platformer")
+from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, YELLOW, GREEN, VIOLET, ORANGE, PLAYER1_COLOR,
+                       PLAYER1_CONTROLS, PLAYER2_CONTROLS, PLAYER2_COLOR)
+from main_menu import main_menu
 
 
 class PowerUpType:
@@ -243,27 +225,25 @@ class Player(pygame.sprite.Sprite):
             self.rect.bottom = SCREEN_HEIGHT
 
 
-def main_menu():
-    menu_font = pygame.font.Font(None, 50)
-    label = menu_font.render("Press any key to start", 1, YELLOW)
-    while True:
-        screen.fill((0, 0, 0))
-        screen.blit(label, (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2))
-        pygame.display.update()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                return
+# def main_menu():
+#     menu_font = pygame.font.Font(None, 50)
+#     label = menu_font.render("Press any key to start", 1, YELLOW)
+#     while True:
+#         screen.fill((0, 0, 0))
+#         screen.blit(label, (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2))
+#         pygame.display.update()
+#         for event in pygame.event.get():
+#             if event.type == pygame.QUIT:
+#                 pygame.quit()
+#                 sys.exit()
+#             elif event.type == pygame.KEYDOWN:
+#                 return
 
 
-def main():
+def main(screen=screen):
     # Create sprites
-    player1 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
-                     {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}, PLAYER1_COLOR)
-    player2 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2,
-                     {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}, PLAYER2_COLOR)
+    player1 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, PLAYER1_CONTROLS, PLAYER1_COLOR)
+    player2 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, PLAYER2_CONTROLS, PLAYER2_COLOR)
     # Font for displaying score
     font = pygame.font.Font(None, 36)
 
@@ -271,7 +251,7 @@ def main():
     game = Game(players=[player1, player2])
     last_platform_score = 0
     # Call the main_menu function before the game loop
-    main_menu()
+    main_menu(main, screen)
     # Main game loop
     running = True
     while running:
@@ -320,4 +300,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(screen=screen)
