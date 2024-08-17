@@ -1,7 +1,7 @@
 import pygame
 import sys
 import math
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT, PLAYER1_COLOR, PLAYER2_COLOR, GRAY
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, PLAYERS, GRAY, BLUE, RED
 
 PLAYER_SIZE = 50
 PLAYER_SPEED = 0.5
@@ -46,9 +46,10 @@ def race_game(screen):
         pygame.draw.rect(screen, GRAY, track)
 
         # Draw the player cars
-        pygame.draw.rect(screen, PLAYER1_COLOR,
+        # for p_color, p_controls in PLAYERS.items():
+        pygame.draw.rect(screen, BLUE,
                          pygame.Rect(player1.position_x, player1.position_y, PLAYER_SIZE, PLAYER_SIZE))
-        pygame.draw.rect(screen, PLAYER2_COLOR,
+        pygame.draw.rect(screen, RED,
                          pygame.Rect(player2.position_x, player2.position_y, PLAYER_SIZE, PLAYER_SIZE))
 
         # Update the game display
@@ -62,7 +63,8 @@ def race_game(screen):
             elif event.type == pygame.KEYDOWN:
                 speed = PLAYER_SPEED
                 if event.key == pygame.K_w:
-                    if not track.colliderect(pygame.Rect(player1.position_x, player1.position_y, PLAYER_SIZE, PLAYER_SIZE)):
+                    if not track.colliderect(
+                            pygame.Rect(player1.position_x, player1.position_y, PLAYER_SIZE, PLAYER_SIZE)):
                         speed /= 2  # Decrease speed while on green
                     player1.speed = speed
                 elif event.key == pygame.K_s:
@@ -72,7 +74,8 @@ def race_game(screen):
                 elif event.key == pygame.K_d:
                     player1.rotation = 5
                 elif event.key == pygame.K_UP:
-                    if not track.colliderect(pygame.Rect(player2.position_x, player2.position_y, PLAYER_SIZE, PLAYER_SIZE)):
+                    if not track.colliderect(
+                            pygame.Rect(player2.position_x, player2.position_y, PLAYER_SIZE, PLAYER_SIZE)):
                         speed /= 2  # Decrease speed while on green
                     player2.speed = speed
                 elif event.key == pygame.K_DOWN:
@@ -101,7 +104,7 @@ def race_game(screen):
             winner_text = font.render(winner_text_str, True, (255, 0, 0))  # Red
             for _ in range(4):
                 screen.blit(winner_text, (
-                SCREEN_WIDTH / 2 - winner_text.get_width() / 2, SCREEN_HEIGHT / 2 - winner_text.get_height() / 2))
+                    SCREEN_WIDTH / 2 - winner_text.get_width() / 2, SCREEN_HEIGHT / 2 - winner_text.get_height() / 2))
                 pygame.display.flip()
                 pygame.time.wait(500)
                 screen.fill(BG_COLOR)

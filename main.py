@@ -9,4 +9,4 @@ pygame.display.set_caption("Platformer")
 
 
 if __name__ == '__main__':
-    main_menu(None, screen)
+    main_menu(screen)

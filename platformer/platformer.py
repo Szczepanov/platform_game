@@ -2,9 +2,8 @@ import pygame
 import sys
 import random
 import time
-from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, YELLOW, GREEN, VIOLET, ORANGE, PLAYER1_COLOR,
-                       PLAYER1_CONTROLS, PLAYER2_CONTROLS, PLAYER2_COLOR)
-from main_menu import main_menu
+from constants import (SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, YELLOW, GREEN, VIOLET, ORANGE, PLAYERS)
+from typing import Optional, List, Dict, Any
 
 
 class PowerUpType:
@@ -62,8 +61,62 @@ class PowerUp(pygame.sprite.Sprite):
         self.type = type  # The type of power-up
 
 
+class Player(pygame.sprite.Sprite):
+    def __init__(self, x, y, controls: Dict[str, Any], color):
+        super().__init__()
+        self.image = pygame.Surface((50, 50))
+        self.original_color = color
+        self.current_color = color
+        self.image.fill(self.current_color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.vel_y = 0
+        self.controls = controls
+        self.original_controls = controls
+        self.key_pressed = {key: False for key in controls.values()}
+
+    def change_color(self, color):
+        self.current_color = color
+        self.image.fill(self.current_color)
+
+    def reset_color(self):
+        self.current_color = self.original_color
+        self.image.fill(self.current_color)
+
+    def update(self):
+        self.vel_y += 0.5  # Gravity
+        self.rect.y += int(self.vel_y)  # Convert self.vel_y to an integer
+
+        # Move left/right
+        keys = pygame.key.get_pressed()
+        if keys[self.controls['left']]:
+            self.rect.x -= 5
+        if keys[self.controls['right']]:
+            self.rect.x += 5
+
+        # Jump
+        if keys[self.controls['up']] and not self.key_pressed.get(self.controls['up']):
+            self.vel_y = - 10
+
+        for control in self.controls.values():
+            if keys[control]:
+                if not self.key_pressed[control]:
+                    self.key_pressed[control] = True
+            else:
+                self.key_pressed[control] = False
+        # Check if player is at the edge of the screen
+        if self.rect.left < -int(self.rect.width / 2):
+            self.rect.left = -int(self.rect.width / 2)
+        if self.rect.right > int(SCREEN_WIDTH + self.rect.width / 2):
+            self.rect.right = int(SCREEN_WIDTH + self.rect.width / 2)
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT:
+            self.rect.bottom = SCREEN_HEIGHT
+
+
 class Game:
-    def __init__(self, players=None, power_ups=None, coins=None, platforms=None):
+    def __init__(self, players: List[Player] = None, power_ups: List[PowerUp] = None, coins: List[Coin] = None,
+                 platforms: List[Platform] = None):
         self.level = 1
         self.power_up = None  # The current power-up
         self.power_up_start_time = None  # The time when the power-up was collected
@@ -109,15 +162,24 @@ class Game:
                                            10))
             self._last_score = self.total_score
 
+    def switch_player_controls(self):
+        temp_controls = self.players[-1].controls
+        for i in range(len(self.players) - 1, 0, -1):
+            self.players[i].controls = self.players[i-1].controls
+        self.players[0].controls = temp_controls
+
+    def reset_player_controls(self):
+        for player in self.players:
+            player.controls = player.original_controls
+
     def update(self):
         self.spawn_platforms()
-        for player in self.players:
+        for player_nr, player in enumerate(self.players):
             player.update()
             for platform in self.platforms:
                 if pygame.sprite.collide_rect(player, platform):
                     if not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
                         self.reset_game()
-                        main_menu()
             for power_up in self.power_ups:
                 if pygame.sprite.collide_rect(player, power_up):
                     self.power_up = power_up.type  # Collect the power-up
@@ -126,8 +188,7 @@ class Game:
                         for p in self.players:
                             p.change_color(WHITE)
                     elif isinstance(self.power_up, SwitchPlayers):
-                        self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[
-                            0].controls
+                        self.switch_player_controls()
                     elif isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
                         for coin in self.coins:
                             coin.image.fill(ORANGE)
@@ -136,7 +197,7 @@ class Game:
                             coin.image.fill(YELLOW)
                     self.power_ups.remove(power_up)
             if isinstance(self.power_up, SwitchPlayers) and time.time() - self.power_up_start_time > 10:
-                self.players[0].controls, self.players[1].controls = self.players[1].controls, self.players[0].controls
+                self.reset_player_controls()
             if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time > 10:
                 for coin in self.coins:
                     coin.image.fill(YELLOW)
@@ -169,7 +230,8 @@ class Game:
             player.rect.x = SCREEN_WIDTH // 2
             player.rect.y = SCREEN_HEIGHT // 2
             player.vel_y = 0
-            player.controls = PLAYER1_CONTROLS if player.original_color == PLAYER1_COLOR else PLAYER2_CONTROLS
+            if player.controls != player.original_controls:
+                player.controls = player.original_controls
         # Clear coins and power-ups
         self.coins.clear()
         self.power_ups.clear()
@@ -180,78 +242,16 @@ class Game:
         self.coin_spawn_time = time.time()
 
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y, controls, color):
-        super().__init__()
-        self.image = pygame.Surface((50, 50))
-        self.original_color = color
-        self.current_color = color
-        self.image.fill(self.current_color)
-        self.rect = self.image.get_rect(center=(x, y))
-        self.vel_y = 0
-        self.controls = controls
-
-    def change_color(self, color):
-        self.current_color = color
-        self.image.fill(self.current_color)
-
-    def reset_color(self):
-        self.current_color = self.original_color
-        self.image.fill(self.current_color)
-
-    def update(self):
-        self.vel_y += 0.5  # Gravity
-        self.rect.y += int(self.vel_y)  # Convert self.vel_y to an integer
-
-        # Move left/right
-        keys = pygame.key.get_pressed()
-        if keys[self.controls['left']]:
-            self.rect.x -= 5
-        if keys[self.controls['right']]:
-            self.rect.x += 5
-
-        # Jump
-        if keys[self.controls['up']]:
-            self.vel_y = - 10
-
-        # Check if player is at the edge of the screen
-        if self.rect.left < -int(self.rect.width / 2):
-            self.rect.left = -int(self.rect.width / 2)
-        if self.rect.right > int(SCREEN_WIDTH + self.rect.width / 2):
-            self.rect.right = int(SCREEN_WIDTH + self.rect.width / 2)
-        if self.rect.top < 0:
-            self.rect.top = 0
-        if self.rect.bottom > SCREEN_HEIGHT:
-            self.rect.bottom = SCREEN_HEIGHT
-
-
-# def main_menu():
-#     menu_font = pygame.font.Font(None, 50)
-#     label = menu_font.render("Press any key to start", 1, YELLOW)
-#     while True:
-#         screen.fill((0, 0, 0))
-#         screen.blit(label, (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2))
-#         pygame.display.update()
-#         for event in pygame.event.get():
-#             if event.type == pygame.QUIT:
-#                 pygame.quit()
-#                 sys.exit()
-#             elif event.type == pygame.KEYDOWN:
-#                 return
-
-
-def main(screen=screen):
+def platformer_game(screen):
     # Create sprites
-    player1 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, PLAYER1_CONTROLS, PLAYER1_COLOR)
-    player2 = Player(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2, PLAYER2_CONTROLS, PLAYER2_COLOR)
+    players = [Player(SCREEN_WIDTH // random.randint(1, 8),
+                      SCREEN_HEIGHT // 3, p_controls, p_color)
+               for p_color, p_controls in PLAYERS.items()]
     # Font for displaying score
     font = pygame.font.Font(None, 36)
 
     # Create game instance
-    game = Game(players=[player1, player2])
-    last_platform_score = 0
-    # Call the main_menu function before the game loop
-    main_menu(main, screen)
+    game = Game(players=players)
     # Main game loop
     running = True
     while running:
@@ -297,7 +297,3 @@ def main(screen=screen):
 
     pygame.quit()
     sys.exit()
-
-
-if __name__ == '__main__':
-    main(screen=screen)

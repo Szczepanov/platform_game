@@ -11,8 +11,6 @@ GREEN = (0, 255, 0)
 VIOLET = (128, 0, 128)
 ORANGE = (255, 165, 0)
 GRAY = (128, 128, 128)
-PLAYER1_COLOR = RED
-PLAYER2_COLOR = BLUE
-# Player controls
-PLAYER1_CONTROLS = {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP}
-PLAYER2_CONTROLS = {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w}
+PLAYERS = {RED: {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'up': pygame.K_UP},
+           BLUE: {'left': pygame.K_a, 'right': pygame.K_d, 'up': pygame.K_w},
+           GRAY: {'left': pygame.K_j, 'right': pygame.K_l, 'up': pygame.K_i}}
