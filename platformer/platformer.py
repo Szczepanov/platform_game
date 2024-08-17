@@ -53,12 +53,12 @@ class Platform(pygame.sprite.Sprite):
 
 
 class PowerUp(pygame.sprite.Sprite):
-    def __init__(self, x, y, type):
+    def __init__(self, x, y, powerup_type):
         super().__init__()
         self.image = pygame.Surface((20, 20))
         self.image.fill(VIOLET)
         self.rect = self.image.get_rect(center=(x, y))
-        self.type = type  # The type of power-up
+        self.powerup_type = powerup_type  # The type of power-up
 
 
 class Player(pygame.sprite.Sprite):
@@ -182,7 +182,7 @@ class Game:
                         self.reset_game()
             for power_up in self.power_ups:
                 if pygame.sprite.collide_rect(player, power_up):
-                    self.power_up = power_up.type  # Collect the power-up
+                    self.power_up = power_up.powerup_type  # Collect the power-up
                     self.power_up_start_time = time.time()  # Start the timer
                     if isinstance(self.power_up, Invincibility):
                         for p in self.players:

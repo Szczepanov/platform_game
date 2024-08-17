@@ -22,7 +22,7 @@ def test_powerup_initialization():
     powerup = PowerUp(100, 100, 'DoubleScore')
     assert powerup.rect.x == 90
     assert powerup.rect.y == 90
-    assert powerup.type == 'DoubleScore'
+    assert powerup.powerup_type == 'DoubleScore'
 
 
 def test_coin_initialization():
