@@ -43,13 +43,46 @@ class Coin(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
 
 
-# Platform class
 class Platform(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height):
         super().__init__()
-        self.image = pygame.Surface((width, height))
-        self.image.fill(GREEN)  # Green color
+        self.original_image = pygame.Surface((width, height))
+        self.original_image.fill(GREEN)  # Green color
+        self.image = self.original_image.copy()
         self.rect = self.image.get_rect(topleft=(x, y))
+
+        # Blinking attributes
+        self.blinking = True
+        self.blink_start_time = time.time()
+        self.blink_duration = 2  # seconds
+        self.blink_interval = 0.5  # seconds
+        self.last_blink_time = self.blink_start_time
+        self.visible = True
+
+    def update(self):
+        if self.blinking:
+            current_time = time.time()
+
+            # Check if blinking duration is over
+            if current_time - self.blink_start_time >= self.blink_duration:
+                self.blinking = False
+                self.image = self.original_image
+                self.visible = True
+            else:
+                # Toggle visibility based on blink_interval
+                if current_time - self.last_blink_time >= self.blink_interval:
+                    self.visible = not self.visible
+                    self.last_blink_time = current_time
+                    if self.visible:
+                        self.image = self.original_image
+                    else:
+                        # Make the platform semi-transparent or invisible
+                        self.image = pygame.Surface(self.original_image.get_size(), pygame.SRCALPHA)
+                        self.image.fill((0, 0, 0, 0))  # Fully transparent
+        else:
+            # Ensure the platform is fully visible when not blinking
+            self.image = self.original_image
+            self.visible = True
 
 
 class PowerUp(pygame.sprite.Sprite):
@@ -78,6 +111,11 @@ class Player(pygame.sprite.Sprite):
         self.current_color = color
         self.image.fill(self.current_color)
 
+    def set_controls(self, new_controls):
+        """Update the player's controls and reset key_pressed."""
+        self.controls = new_controls
+        self.key_pressed = {key: False for key in self.controls.values()}
+
     def reset_color(self):
         self.current_color = self.original_color
         self.image.fill(self.current_color)
@@ -99,7 +137,7 @@ class Player(pygame.sprite.Sprite):
 
         for control in self.controls.values():
             if keys[control]:
-                if not self.key_pressed[control]:
+                if not self.key_pressed.get(control, False):
                     self.key_pressed[control] = True
             else:
                 self.key_pressed[control] = False
@@ -163,10 +201,10 @@ class Game:
             self._last_score = self.total_score
 
     def switch_player_controls(self):
-        temp_controls = self.players[-1].controls
+        temp_controls = self.players[-1].controls.copy()
         for i in range(len(self.players) - 1, 0, -1):
-            self.players[i].controls = self.players[i-1].controls
-        self.players[0].controls = temp_controls
+            self.players[i].set_controls(self.players[i-1].controls.copy())
+        self.players[0].set_controls(temp_controls.copy())
 
     def reset_player_controls(self):
         for player in self.players:
@@ -174,14 +212,21 @@ class Game:
 
     def update(self):
         self.spawn_platforms()
+
+        for platform in self.platforms:
+            platform.update()
+
         for player_nr, player in enumerate(self.players):
             player.update()
             for platform in self.platforms:
                 if pygame.sprite.collide_rect(player, platform):
-                    if not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
+                    if not platform.blinking and not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
                         self.reset_game()
             for power_up in self.power_ups:
                 if pygame.sprite.collide_rect(player, power_up):
+                    for coin in self.coins:
+                        coin.image.fill(YELLOW)
+                    self.reset_player_controls()
                     self.power_up = power_up.powerup_type  # Collect the power-up
                     self.power_up_start_time = time.time()  # Start the timer
                     if isinstance(self.power_up, Invincibility):
