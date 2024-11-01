@@ -35,6 +35,14 @@ class Invincibility(PowerUpType):
         return self.name
 
 
+class ShapeShift(PowerUpType):
+    def __init__(self):
+        super().__init__(name='Shape Shift')
+
+    def __repr__(self):
+        return self.name
+
+
 class Coin(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -97,19 +105,25 @@ class PowerUp(pygame.sprite.Sprite):
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, controls: Dict[str, Any], color):
         super().__init__()
-        self.image = pygame.Surface((50, 50))
         self.original_color = color
         self.current_color = color
-        self.image.fill(self.current_color)
+        self.original_width = 50
+        self.original_height = 50
+        self.image = pygame.Surface((self.original_width, self.original_height), pygame.SRCALPHA)
+        self.original_image = self.image.copy()
         self.rect = self.image.get_rect(center=(x, y))
         self.vel_y = 0
         self.controls = controls
         self.original_controls = controls
         self.key_pressed = {key: False for key in controls.values()}
+        self.shape = 'rectangle'  # Default shape
+        self.scale_factor = 1.0    # Default scale
+
+        self.update_image()  # Initialize the image with the default shape
 
     def change_color(self, color):
         self.current_color = color
-        self.image.fill(self.current_color)
+        self.update_image()
 
     def set_controls(self, new_controls):
         """Update the player's controls and reset key_pressed."""
@@ -118,11 +132,48 @@ class Player(pygame.sprite.Sprite):
 
     def reset_color(self):
         self.current_color = self.original_color
-        self.image.fill(self.current_color)
+        self.update_image()
+
+    def change_shape_and_size(self, shape: str, scale_factor: float):
+        """Change the player's shape and size."""
+        self.shape = shape
+        self.scale_factor = scale_factor
+        self.update_image()
+
+    def reset_shape_and_size(self):
+        """Reset the player's shape and size to original."""
+        self.shape = 'rectangle'
+        self.scale_factor = 1.0
+        self.update_image()
+
+    def update_image(self):
+        """Redraw the player's image based on the current shape and size."""
+        # Calculate new size
+        width = int(self.original_width * self.scale_factor)
+        height = int(self.original_height * self.scale_factor)
+
+        # Create a new surface with the calculated size
+        self.image = pygame.Surface((width, height), pygame.SRCALPHA)
+
+        # Draw the current shape
+        if self.shape == 'circle':
+            pygame.draw.circle(self.image, self.current_color, (width // 2, height // 2), min(width, height) // 2)
+        elif self.shape == 'triangle':
+            points = [
+                (width // 2, 0),
+                (0, height),
+                (width, height)
+            ]
+            pygame.draw.polygon(self.image, self.current_color, points)
+        else:  # Default rectangle
+            self.image.fill(self.current_color)
+
+        # Update the rect to maintain the center position
+        self.rect = self.image.get_rect(center=self.rect.center)
 
     def update(self):
         self.vel_y += 0.5  # Gravity
-        self.rect.y += int(self.vel_y)  # Convert self.vel_y to an integer
+        self.rect.y += int(self.vel_y)
 
         # Move left/right
         keys = pygame.key.get_pressed()
@@ -141,7 +192,7 @@ class Player(pygame.sprite.Sprite):
                     self.key_pressed[control] = True
             else:
                 self.key_pressed[control] = False
-        # Check if player is at the edge of the screen
+
         if self.rect.left < -int(self.rect.width / 2):
             self.rect.left = -int(self.rect.width / 2)
         if self.rect.right > int(SCREEN_WIDTH + self.rect.width / 2):
@@ -188,7 +239,7 @@ class Game:
         if time.time() - self.power_up_spawn_time > 10 and len(self.power_ups) < 1:  # Spawn a power-up every 10 seconds
             power_up_x = random.randint(0, SCREEN_WIDTH)
             power_up_y = random.randint(0, SCREEN_HEIGHT)
-            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility(), SwitchPlayers()]))
+            power_up = PowerUp(power_up_x, power_up_y, random.choice([DoubleScore(), Invincibility(), SwitchPlayers(), ShapeShift()]))
             self.power_ups.append(power_up)
             self.power_up_spawn_time = time.time()
 
@@ -213,6 +264,7 @@ class Game:
     def update(self):
         self.spawn_platforms()
 
+        # Update each platform's blinking state
         for platform in self.platforms:
             platform.update()
 
@@ -220,6 +272,7 @@ class Game:
             player.update()
             for platform in self.platforms:
                 if pygame.sprite.collide_rect(player, platform):
+                    # Only reset the game if the platform is not blinking
                     if not platform.blinking and not (isinstance(self.power_up, Invincibility) and time.time() - self.power_up_start_time <= 10):
                         self.reset_game()
             for power_up in self.power_ups:
@@ -229,18 +282,32 @@ class Game:
                     self.reset_player_controls()
                     self.power_up = power_up.powerup_type  # Collect the power-up
                     self.power_up_start_time = time.time()  # Start the timer
+
+                    # Apply the power-up effects
                     if isinstance(self.power_up, Invincibility):
                         for p in self.players:
                             p.change_color(WHITE)
                     elif isinstance(self.power_up, SwitchPlayers):
                         self.switch_player_controls()
-                    elif isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
-                        for coin in self.coins:
-                            coin.image.fill(ORANGE)
-                    else:
-                        for coin in self.coins:
-                            coin.image.fill(YELLOW)
+                    elif isinstance(self.power_up, DoubleScore):
+                        if time.time() - self.power_up_start_time <= 10:
+                            for coin in self.coins:
+                                coin.image.fill(ORANGE)
+                    elif isinstance(self.power_up, ShapeShift):
+                        # Choose random shape
+                        shape = random.choice(['circle', 'triangle'])
+                        # Choose size adjustment
+                        size_change = random.choice(['increase', 'decrease'])
+                        if size_change == 'increase':
+                            scale_factor = 1.1  # Increase size by 10%
+                        else:
+                            scale_factor = 0.7  # Decrease size by 30%
+                        # Apply to all players
+                        for p in self.players:
+                            p.change_shape_and_size(shape, scale_factor)
+
                     self.power_ups.remove(power_up)
+            # Handle power-up durations
             if isinstance(self.power_up, SwitchPlayers) and time.time() - self.power_up_start_time > 10:
                 self.reset_player_controls()
             if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time > 10:
@@ -250,6 +317,11 @@ class Game:
                     not isinstance(self.power_up, Invincibility) and player.current_color == WHITE):
                 for p in self.players:
                     p.reset_color()
+            if isinstance(self.power_up, ShapeShift) and time.time() - self.power_up_start_time > 10:
+                for p in self.players:
+                    p.reset_shape_and_size()
+                self.power_up = None  # Reset current power-up
+
             for coin in self.coins:
                 if pygame.sprite.collide_rect(player, coin):
                     if isinstance(self.power_up, DoubleScore) and time.time() - self.power_up_start_time <= 10:
@@ -271,7 +343,8 @@ class Game:
         self._last_score = 0
         # Reset player attributes
         for player in self.players:
-            player.image.fill(player.original_color)  # Reset player color
+            player.reset_color()  # Reset player color
+            player.reset_shape_and_size()  # Reset shape and size
             player.rect.x = SCREEN_WIDTH // 2
             player.rect.y = SCREEN_HEIGHT // 2
             player.vel_y = 0
@@ -285,6 +358,7 @@ class Game:
         # Reset spawn timers
         self.power_up_spawn_time = time.time()
         self.coin_spawn_time = time.time()
+
 
 
 def platformer_game(screen):
