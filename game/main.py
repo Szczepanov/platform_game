@@ -1,6 +1,6 @@
 from main_menu import main_menu
 import pygame
-from constants import SCREEN_WIDTH, SCREEN_HEIGHT
+from utils.constants import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Initialize Pygame
 pygame.init()
