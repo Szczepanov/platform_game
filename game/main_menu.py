@@ -7,11 +7,17 @@ from racer.racer import race_game
 from platformer import platformer_game
 from jumper import jumper_game
 from catcher import catcher_game
+from cooperative import cooperative_platformer_game
 
 
 def main_menu(screen):
     menu_font = pygame.font.Font(None, 50)
-    options = ["Start the Platformer Game", "Start the Race Game", "Start the Jump Game", "Start the Catcher Game", "Quit"]
+    options = ["Start the Platformer Game",
+               "Start the Race Game",
+               "Start the Jump Game",
+               "Start the Catcher Game",
+               "Start the Jumpy Tower",
+               "Quit"]
     selected_option = 0
     num_players = 2  # Default to 2 players
     while True:
@@ -30,7 +36,7 @@ def main_menu(screen):
             else:
                 label = menu_font.render(option, 1, WHITE)
             screen.blit(label,
-                        (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2 + i * 60))
+                        (SCREEN_WIDTH / 2 - label.get_width() / 2, SCREEN_HEIGHT / 2 - label.get_height() / 2 + i * 50))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -54,6 +60,8 @@ def main_menu(screen):
                         jumper_game(screen, num_players)
                     elif selected_option == 3:
                         catcher_game(screen, num_players)
+                    elif selected_option == 4:
+                        cooperative_platformer_game(screen, num_players)
                     else:
                         pygame.quit()
                         sys.exit()
