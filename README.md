@@ -1,40 +1,47 @@
-# Platformer Game
+# Pygame Arcade Collection
 
-This is a simple platformer game built with Python and Pygame.
+A collection of retro-style minigames built with Python and Pygame. This project serves as a hub to launch various arcade games from a central main menu.
 
-## Features
+## Available Games
 
-- Two players with different controls.
-- Power-ups that give players special abilities.
-- Coins that increase the player's score.
-- Platforms that spawn based on the player's score.
-- Levels that increase as the player's score increases.
-
-## Power-ups
-
-- `DoubleScore`: Doubles the score for each coin collected.
-- `Invincibility`: Prevents the player from losing when colliding with a platform.
-- `SwitchPlayers`: Switches the controls of the two players.
-
-## Controls
-
-- Player 1: Use the arrow keys to move and jump.
-- Player 2: Use the 'W', 'A', and 'D' keys to move and jump.
-
-## Running the Game
-
-To run the game, execute the `platformer.py` script with Python.
+- **Platformer**: A classic platforming adventure suitable for 1-2 players.
+- **Race Game**: A top-down racing game.
+- **Jump Game**: A vertical jumping challenge.
+- **Catcher**: Catch falling objects to score points.
+- **Cooperative**: A "Jumpy Tower" cooperative platformer where players must work together.
 
 ## Requirements
 
-- Python
+- Python 3.8+
 - Pygame
-- pip
+- Numpy
 
-## How to Run
+## Installation
 
-To run the game, simply execute the `platformer.py` script with Python.
+You can install the dependencies using pip:
 
 ```bash
-python platformer.py
+pip install -r requirements.txt
 ```
+
+or if you are using `uv`:
+
+```bash
+uv sync
+```
+
+## Running the Game
+
+To launch the arcade main menu:
+
+```bash
+python game/main.py
+```
+
+## Controls
+
+The game supports keyboard controls.
+- **Menu Navigation**: Arrow keys to select game and number of players. Enter to start.
+- **Player 1**: Arrow keys (usually).
+- **Player 2**: WASD keys (usually).
+*Specific controls may vary per minigame.*
