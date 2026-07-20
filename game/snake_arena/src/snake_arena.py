@@ -39,6 +39,8 @@ SHIELD_INVULNERABLE_SECONDS = 0.3
 SPEED_BOOST_SECONDS = 3.0
 POWERUP_SPAWN_INTERVAL_SECONDS = 6
 DOUBLE_FOOD_CHARGES = 2
+BITE_SEGMENTS = 1
+BITE_COOLDOWN_SECONDS = 0.5
 EVENT_INTERVAL_SECONDS = 18
 EVENT_DURATION_SECONDS = 10
 
@@ -116,6 +118,7 @@ class SnakeState:
     speed_boost_until: float = 0.0
     double_food_charges: int = 0
     speed_extra_progress: float = 0.0
+    bite_cooldown_until: float = 0.0
 
 
 def is_reverse(current_direction, candidate_direction):
@@ -470,6 +473,9 @@ def draw_hud(
             effects.append(f"Speed:{speed_left}s")
         if snake.double_food_charges > 0:
             effects.append(f"2xFood:{snake.double_food_charges}")
+        if now_seconds < snake.bite_cooldown_until:
+            bite_left = max(0, int((snake.bite_cooldown_until - now_seconds) * 10))
+            effects.append(f"BiteCD:{bite_left / 10:.1f}s")
         effect_text = f"  {' | '.join(effects)}" if effects else ""
         text = (
             f"P{snake.player_id}  Wins:{round_wins[idx]}  "
@@ -585,7 +591,46 @@ def collect_powerup(players, powerup, now_seconds):
     return None
 
 
-def gather_collision_victims(players, old_heads, planned_heads, now_seconds):
+def resolve_bites(players, now_seconds):
+    bite_immunity = set()
+    bite_messages = []
+
+    for attacker in players:
+        if not attacker.alive or not attacker.body:
+            continue
+        if now_seconds < attacker.invulnerable_until:
+            continue
+        if now_seconds < attacker.bite_cooldown_until:
+            continue
+
+        attacker_head = attacker.body[0]
+        for defender in players:
+            if defender.player_id == attacker.player_id or not defender.alive:
+                continue
+            if attacker_head not in defender.body[1:]:
+                continue
+
+            stealable = max(0, len(defender.body) - MIN_SURVIVE_LENGTH)
+            stolen = min(BITE_SEGMENTS, stealable)
+            if stolen <= 0:
+                break
+
+            defender.body = defender.body[:-stolen]
+            attacker.pending_growth += stolen
+            attacker.bite_cooldown_until = now_seconds + BITE_COOLDOWN_SECONDS
+            bite_immunity.add(attacker.player_id)
+            bite_messages.append(
+                f"P{attacker.player_id} bit P{defender.player_id} (+{stolen})"
+            )
+            break
+
+    message = bite_messages[0] if bite_messages else None
+    return bite_immunity, message
+
+
+def gather_collision_victims(
+    players, old_heads, planned_heads, now_seconds, bite_immunity
+):
     victims = set()
     alive = [snake for snake in players if snake.alive]
 
@@ -598,6 +643,8 @@ def gather_collision_victims(players, old_heads, planned_heads, now_seconds):
 
     for snake in alive:
         if snake.player_id in victims:
+            continue
+        if snake.player_id in bite_immunity:
             continue
         if now_seconds < snake.invulnerable_until:
             continue
@@ -769,8 +816,13 @@ def run_single_round(screen, clock, num_players, round_index, round_wins):
                 pickup_message_until = now_seconds + 1.2
                 powerup = None
 
+            bite_immunity, bite_message = resolve_bites(players, now_seconds)
+            if bite_message is not None:
+                pickup_message = bite_message
+                pickup_message_until = now_seconds + 1.0
+
             victims = gather_collision_victims(
-                players, old_heads, planned_heads, now_seconds
+                players, old_heads, planned_heads, now_seconds, bite_immunity
             )
             for snake in players:
                 if snake.player_id in victims:

@@ -16,10 +16,15 @@ MOMENTUM_BUILD_RATE = 1/60  # momentum per frame while running
 MOMENTUM_DECAY_RATE = 0.2  # momentum decay rate (reduced from 0.5 for slower decay)
 MOMENTUM_JUMP_MULTIPLIER = 0.3  # jump strength bonus per momentum unit
 MOMENTUM_MAX = 3.0  # Maximum momentum cap (3 seconds)
+COYOTE_FRAMES = 6  # small grace period to keep grounded actions responsive
+GROUND_SNAP_TOLERANCE = 6  # pixels for stable platform grounding
 PLATFORM_WIDTH = 100
 PLATFORM_HEIGHT = 20
 PLAYER_SIZE = 30
 SCROLL_SPEED = 2  # Auto-scroll speed
+POWERUP_SIZE = 18
+POWERUP_SPAWN_INTERVAL_FRAMES = 240
+MAX_COOP_POWERUPS = 3
 
 class Player:
     def __init__(self, x, y, color, controls, player_id):
@@ -48,6 +53,7 @@ class Player:
         # Momentum system
         self.momentum = 0.0  # Current momentum in seconds
         self.last_direction = 0  # Last direction moved (-1, 0, 1)
+        self.ground_coyote_timer = 0
         
         # Edge bouncing
         self.just_bounced = False
@@ -92,6 +98,26 @@ class Player:
                     self.y = platform.y + scroll_offset - self.height
                     self.vel_y = 0
                     self.on_ground = True
+
+        # Keep platform contact stable after landing (prevents momentum drop flicker).
+        if not self.on_ground and self.vel_y >= 0:
+            for platform in platforms:
+                platform_y = platform.y + scroll_offset
+                horizontal_overlap = (
+                    self.x < platform.x + platform.width and
+                    self.x + self.width > platform.x
+                )
+                near_platform_top = abs((self.y + self.height) - platform_y) <= GROUND_SNAP_TOLERANCE
+                if horizontal_overlap and near_platform_top:
+                    self.y = platform_y - self.height
+                    self.vel_y = 0
+                    self.on_ground = True
+                    break
+
+        if self.on_ground:
+            self.ground_coyote_timer = COYOTE_FRAMES
+        elif self.ground_coyote_timer > 0:
+            self.ground_coyote_timer -= 1
                     
         # Update momentum based on movement and collision state
         if not self.is_sliding:
@@ -102,7 +128,7 @@ class Player:
                 current_direction = 1
             
             # Build momentum when running on ground or platforms
-            if current_direction != 0 and self.on_ground:
+            if current_direction != 0 and (self.on_ground or self.ground_coyote_timer > 0):
                 self.momentum += MOMENTUM_BUILD_RATE
                 self.momentum = min(self.momentum, MOMENTUM_MAX)  # Cap momentum at maximum
                 self.last_direction = current_direction
@@ -373,6 +399,38 @@ class Platform:
                 pygame.draw.circle(screen, YELLOW, 
                                  (int(self.x + self.width//2), int(draw_y + self.height//2)), 8)
 
+class PowerUp:
+    def __init__(self, x, y, powerup_type):
+        self.x = x
+        self.y = y
+        self.size = POWERUP_SIZE
+        self.powerup_type = powerup_type  # extra_life, momentum, score
+        self.colors = {
+            'extra_life': (255, 105, 180),
+            'momentum': (0, 255, 255),
+            'score': (255, 165, 0),
+        }
+
+    def get_rect(self, scroll_offset):
+        draw_y = self.y + scroll_offset
+        return pygame.Rect(
+            int(self.x - self.size // 2),
+            int(draw_y - self.size // 2),
+            self.size,
+            self.size,
+        )
+
+    def collides_with(self, player, scroll_offset):
+        player_rect = pygame.Rect(int(player.x), int(player.y), player.width, player.height)
+        return player_rect.colliderect(self.get_rect(scroll_offset))
+
+    def draw(self, screen, scroll_offset):
+        draw_y = self.y + scroll_offset
+        if -50 < draw_y < SCREEN_HEIGHT + 50:
+            color = self.colors[self.powerup_type]
+            pygame.draw.circle(screen, color, (int(self.x), int(draw_y)), self.size // 2)
+            pygame.draw.circle(screen, WHITE, (int(self.x), int(draw_y)), self.size // 2, 2)
+
 def cooperative_platformer_game(screen, num_players=1):
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 36)
@@ -407,6 +465,10 @@ def cooperative_platformer_game(screen, num_players=1):
     game_over = False
     shared_lives = 3  # Following existing project pattern
     game_started = False  # Flag to control when scrolling starts
+    powerups = []
+    powerup_spawn_counter = 0
+    pickup_message = ""
+    pickup_message_timer = 0
     
     # Initialize platforms
     generate_initial_platforms(platforms)
@@ -481,6 +543,11 @@ def cooperative_platformer_game(screen, num_players=1):
                 dynamic_scroll_speed = min(dynamic_scroll_speed, max_scroll_speed)
                 
                 scroll_offset += dynamic_scroll_speed
+
+            if pickup_message_timer > 0:
+                pickup_message_timer -= 1
+            else:
+                pickup_message = ""
             
             # Update players
             for player in players:
@@ -504,12 +571,44 @@ def cooperative_platformer_game(screen, num_players=1):
                     game_started = False  # Reset scrolling flag
                     platforms.clear()
                     generate_initial_platforms(platforms)
+                    powerups.clear()
+                    powerup_spawn_counter = 0
             
             # Generate new platforms as needed
             generate_new_platforms(platforms, scroll_offset)
+
+            # Spawn and manage powerups
+            powerup_spawn_counter += 1
+            if powerup_spawn_counter >= POWERUP_SPAWN_INTERVAL_FRAMES:
+                spawn_powerup(powerups, platforms, scroll_offset)
+                powerup_spawn_counter = 0
             
             # Remove platforms that are too far above screen
             platforms = [p for p in platforms if p.y + scroll_offset < SCREEN_HEIGHT + 100]
+            powerups = [
+                powerup for powerup in powerups
+                if -100 < powerup.y + scroll_offset < SCREEN_HEIGHT + 100
+            ]
+
+            # Check powerup collection
+            for player in players:
+                if not player.alive:
+                    continue
+
+                for powerup in powerups[:]:
+                    if powerup.collides_with(player, scroll_offset):
+                        if powerup.powerup_type == 'extra_life':
+                            shared_lives = min(shared_lives + 1, 5)
+                            pickup_message = f"P{player.player_id} picked Extra Life!"
+                        elif powerup.powerup_type == 'momentum':
+                            player.momentum = min(MOMENTUM_MAX, player.momentum + 1.2)
+                            pickup_message = f"P{player.player_id} picked Momentum Boost!"
+                        elif powerup.powerup_type == 'score':
+                            score += 250
+                            pickup_message = f"P{player.player_id} picked Score Boost!"
+
+                        pickup_message_timer = 120
+                        powerups.remove(powerup)
             
             # Check cooperative platforms for bonus
             coop_bonus = check_cooperative_platforms(players, platforms, scroll_offset)
@@ -529,6 +628,10 @@ def cooperative_platformer_game(screen, num_players=1):
         # Draw players
         for player in players:
             player.draw(screen)
+
+        # Draw powerups
+        for powerup in powerups:
+            powerup.draw(screen, scroll_offset)
         
         # Draw connection lines when players can boost
         for i, player_a in enumerate(players):
@@ -552,8 +655,19 @@ def cooperative_platformer_game(screen, num_players=1):
             bonus_text = font.render(f"COOP x{coop_bonus}!", True, YELLOW)
             screen.blit(bonus_text, (10, 90))
         
-        # Controls
         font_small = pygame.font.Font(None, 24)
+
+        # Explain green platforms and powerups
+        coop_help_text = font_small.render("Green platforms: all alive players stand on them for COOP x2", True, GREEN)
+        screen.blit(coop_help_text, (10, 115))
+        powerup_help_text = font_small.render("Powerups: Pink=+Life  Cyan=+Momentum  Orange=+Score", True, WHITE)
+        screen.blit(powerup_help_text, (10, 140))
+
+        if pickup_message_timer > 0:
+            pickup_text = font.render(pickup_message, True, YELLOW)
+            screen.blit(pickup_text, (SCREEN_WIDTH // 2 - pickup_text.get_width() // 2, 15))
+        
+        # Controls
         controls1 = font_small.render("P1: A/D to move, W to jump, S to boost", True, BLUE)
         controls2 = font_small.render("P2: Arrows to move, Up to jump, Down to boost", True, RED)
         screen.blit(controls1, (10, SCREEN_HEIGHT - 50))
@@ -696,11 +810,47 @@ def check_cooperative_platforms(players, platforms, scroll_offset):
     # Check if all players are on cooperative platforms for bonus
     players_on_coop = 0
     for player in players:
-        if player.alive and any(p.platform_type == 'cooperative' and player.check_collision(p, scroll_offset) 
-                              for p in platforms):
+        if player.alive and any(
+            p.platform_type == 'cooperative' and is_player_standing_on_platform(player, p, scroll_offset)
+            for p in platforms
+        ):
             players_on_coop += 1
     
     if len([p for p in players if p.alive]) > 1 and players_on_coop == len([p for p in players if p.alive]):
         return 2  # 2x bonus if all alive players are on cooperative platforms
     else:
         return 1
+
+def is_player_standing_on_platform(player, platform, scroll_offset):
+    platform_y = platform.y + scroll_offset
+    player_bottom = player.y + player.height
+    return (
+        player.on_ground and
+        player.x < platform.x + platform.width and
+        player.x + player.width > platform.x and
+        abs(player_bottom - platform_y) <= 6
+    )
+
+def spawn_powerup(powerups, platforms, scroll_offset):
+    if len(powerups) >= MAX_COOP_POWERUPS:
+        return
+
+    visible_platforms = [
+        platform for platform in platforms
+        if 50 < platform.y + scroll_offset < SCREEN_HEIGHT - 20 and platform.width >= 70
+    ]
+    if not visible_platforms:
+        return
+
+    for _ in range(10):
+        platform = random.choice(visible_platforms)
+        x = random.randint(int(platform.x + 12), int(platform.x + platform.width - 12))
+        y = platform.y - POWERUP_SIZE
+        too_close = any(
+            abs(existing.x - x) < POWERUP_SIZE * 2 and abs(existing.y - y) < POWERUP_SIZE * 2
+            for existing in powerups
+        )
+        if not too_close:
+            powerup_type = random.choice(['extra_life', 'momentum', 'score'])
+            powerups.append(PowerUp(x, y, powerup_type))
+            return
